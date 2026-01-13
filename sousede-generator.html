@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Sousedé – generátor příkladů</title>
+
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            display: flex;
+            gap: 40px;
+        }
+
+        #left {
+            flex: 1;
+        }
+
+        #right {
+            width: 360px;
+            font-size: 18px;
+            line-height: 1.5;
+            float: left;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        #controls {
+            margin-bottom: 20px;
+        }
+
+        #controls input[type="number"] {
+            width: 60px;
+            margin-right: 15px;
+        }
+
+        #controls button {
+            margin-right: 10px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 5px;
+            align-items: center;
+        }
+
+        .info {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .box {
+            width: 50px;
+            height: 50px;
+            border: 2px solid black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .box input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-sizing: border-box;
+        }
+
+        .wrong {
+            background-color: #ffb3b3;
+        }
+
+        .correct {
+            background-color: #b3ffb3;
+        }
+
+        @media print {
+            #controls, #right {
+                display: none;
+            }
+            body {
+                margin: 10mm;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="left">
+    <h1>Sousedé – generátor příkladů</h1><br>
+
+    <div id="controls">
+        <strong>Součet každých tří sousedních čísel:</strong>
+        <input id="sumS" type="number" value="20"></strong><br><br>
+        
+        Počet políček:
+        <input id="count" type="number" min="4" max="10" value="7"><br><br>
+
+        Počet příkladů:
+        <input id="examples" type="number" min="1" max="10" value="3"><br><br>
+
+        <button onclick="generate()">Vygenerovat</button>
+        <button onclick="checkAll()">Zkontrolovat</button>
+        <button onclick="showSolutions()">Ukázat řešení</button><br><br>
+        
+           <label>
+            <input type="checkbox" id="variantB">
+            Varianta 2
+        </label>
+    </div>
+
+    <div id="tasks"></div>
+</div>
+
+<div id="right">
+    <strong>Pravidla:</strong><br>
+    Doplňte do řádku čísla tak, aby součet každých tří sousedních čísel byl zvolené číslo.<br>
+    
+    <strong>Varianta 2: </strong>navíc celkový součet všech čísel v řádku je dané číslo. Tato varianta je dostupná pouze pro
+    4, 7 nebo 10 políček.
+</div>
+
+<script>
+let tasksData = [];
+let lastPairA = null;
+
+function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generate() {
+    const count = parseInt(document.getElementById("count").value);
+    const S = parseInt(document.getElementById("sumS").value);
+    const examples = parseInt(document.getElementById("examples").value);
+    const variantB = document.getElementById("variantB");
+
+    if (variantB.checked && ![4, 7, 10].includes(count)) {
+        alert("Varianta B je dostupná pouze pro 4, 7 nebo 10 políček.");
+        variantB.checked = false;
+    }
+
+    const tasks = document.getElementById("tasks");
+    tasks.innerHTML = "";
+    tasksData = [];
+    lastPairA = null;
+
+    for (let e = 0; e < examples; e++) {
+        const task = variantB.checked
+            ? generateVariantB(count, S)
+            : generateVariantA(count, S);
+
+        tasksData.push(task);
+        tasks.appendChild(task.element);
+
+        if (task.type === "B") {
+            const info = document.createElement("div");
+            info.className = "info";
+            info.textContent = "Celkový součet všech čísel je " + task.X + ".";
+            tasks.appendChild(info);
+        }
+    }
+}
+
+/* -------- VARIANTA A -------- */
+
+function generateTriple(S) {
+    // všechna čísla musí být >= 1
+    const a = randInt(1, S - 2);
+    const b = randInt(1, S - a - 1);
+    const c = S - a - b;
+    return [a, b, c];
+}
+
+function generateVariantA(count, S) {
+    const pattern = generateTriple(S);
+
+    const solution = new Array(count);
+    for (let i = 0; i < count; i++) {
+        solution[i] = pattern[i % 3];
+    }
+
+    let pos1, pos2, key;
+
+    do {
+        pos1 = randInt(0, count - 1);
+
+        do {
+            pos2 = randInt(0, count - 1);
+            const gap = Math.abs(pos2 - pos1) - 1;
+            if (pos2 !== pos1 && gap !== 2 && gap !== 5 && gap !== 8) break;
+        } while (true);
+
+        const p1 = Math.min(pos1, pos2);
+        const p2 = Math.max(pos1, pos2);
+        key = p1 + "-" + p2;
+
+    } while (lastPairA !== null && key === lastPairA);
+
+    lastPairA = key;
+
+    const fixed = {};
+    fixed[pos1] = solution[pos1];
+    fixed[pos2] = solution[pos2];
+
+    const row = createRow(count, fixed);
+
+    return { element: row, boxes: row.boxes, S, solution, type: "A" };
+}
+
+/* -------- VARIANTA B -------- */
+
+function generateVariantB(count, S) {
+    const pattern = generateTriple(S);
+
+    const solution = new Array(count);
+    for (let i = 0; i < count; i++) {
+        solution[i] = pattern[i % 3];
+    }
+
+    const X = solution.reduce((s, v) => s + v, 0);
+
+    let pos;
+    do {
+        pos = randInt(1, count - 2);
+    } while (pos % 3 === 1);
+
+    const row = createRow(count, { [pos]: solution[pos] });
+
+    return { element: row, boxes: row.boxes, S, X, solution, type: "B" };
+}
+
+/* -------- Vykreslení řádku -------- */
+
+function createRow(count, fixedValues) {
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const boxes = [];
+
+    for (let i = 0; i < count; i++) {
+        const box = document.createElement("div");
+        box.className = "box";
+
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = 1;   // ⬅️ žádné nuly
+
+        if (fixedValues && fixedValues[i] !== undefined) {
+            input.value = fixedValues[i];
+            input.disabled = true;
+        }
+
+        box.appendChild(input);
+        boxes.push(input);
+        row.appendChild(box);
+    }
+
+    row.boxes = boxes;
+    return row;
+}
+
+/* -------- Kontrola -------- */
+
+function checkAll() {
+    tasksData.forEach(task => {
+        if (task.type === "A") checkTaskA(task);
+        else checkTaskB(task);
+    });
+}
+
+function markTriple(boxes, i, ok) {
+    for (let k = 0; k < 3; k++) {
+        boxes[i + k].parentElement.classList.add(ok ? "correct" : "wrong");
+    }
+}
+
+function clearMarks(boxes) {
+    boxes.forEach(b => b.parentElement.classList.remove("wrong", "correct"));
+}
+
+function checkTaskA(task) {
+    const { boxes, S } = task;
+
+    clearMarks(boxes);
+
+    let allOK = true;
+
+    for (let i = 0; i < boxes.length - 2; i++) {
+        const x = parseInt(boxes[i].value);
+        const y = parseInt(boxes[i+1].value);
+        const z = parseInt(boxes[i+2].value);
+
+        const ok = (!isNaN(x) && !isNaN(y) && !isNaN(z) && x + y + z === S);
+
+        if (!ok) allOK = false;
+        if (!ok) markTriple(boxes, i, false);
+    }
+
+    if (allOK) {
+        boxes.forEach(b => b.parentElement.classList.add("correct"));
+    }
+}
+
+function checkTaskB(task) {
+    const { boxes, S, X } = task;
+
+    clearMarks(boxes);
+
+    let allOK = true;
+
+    for (let i = 0; i < boxes.length - 2; i++) {
+        const x = parseInt(boxes[i].value);
+        const y = parseInt(boxes[i+1].value);
+        const z = parseInt(boxes[i+2].value);
+
+        const ok = (!isNaN(x) && !isNaN(y) && !isNaN(z) && x + y + z === S);
+
+        if (!ok) allOK = false;
+        if (!ok) markTriple(boxes, i, false);
+    }
+
+    const sum = boxes.reduce((s, b) => s + (parseInt(b.value) || 0), 0);
+    if (sum !== X) allOK = false;
+
+    if (allOK) {
+        boxes.forEach(b => b.parentElement.classList.add("correct"));
+    }
+}
+
+/* -------- Ukázat řešení -------- */
+
+function showSolutions() {
+    tasksData.forEach(task => {
+        const solution = task.solution;
+        const boxes = task.boxes;
+        for (let i = 0; i < boxes.length; i++) {
+            boxes[i].value = solution[i];
+        }
+    });
+}
+
+window.onload = generate;
+</script>
+
+</body>
+</html>
